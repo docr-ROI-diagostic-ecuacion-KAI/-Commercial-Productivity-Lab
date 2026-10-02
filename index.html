@@ -70,6 +70,8 @@
 @media(max-width:1100px){.crm-self-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.source-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.source-grid,.crm-self-grid{grid-template-columns:1fr}.intelligence-v6{grid-template-columns:repeat(2,1fr)}.intelligence-v6 .intel.primary,.intelligence-v6 .intel.mini{grid-column:span 1}}
 
+
+.closing-gates{display:grid;gap:7px;margin-top:12px}.closing-gate{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #dde5ee;border-radius:7px;padding:8px 9px;font-size:10px}.closing-gate b{font-size:10px}.closing-gate.ok{background:#eef8f2;border-color:#b8dfc8;color:#135f3a}.closing-gate.pending{background:#fff8eb;border-color:#efd6aa;color:#85530b}.payment-ready-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:900;letter-spacing:.04em}.payment-ready-badge.ready{background:#0b0f19;color:#fff}.payment-ready-badge.pending{background:#fff8eb;color:#85530b;border:1px solid #efd6aa}.demo-bank-note{font-size:9px;color:#85530b}.handoff-status.ready{background:#0b0f19;color:#fff;border-radius:999px;padding:4px 6px;font-weight:900}.handoff-status.pending{background:#fff8eb;color:#85530b;border:1px solid #efd6aa;border-radius:999px;padding:4px 6px;font-weight:900}
 </style>
 </head>
 <body>
@@ -182,7 +184,35 @@
       <div class="subhead"><div><h3>Contract</h3><p>The contract preview is generated from the selected lead and saved proposal. Confirm the terms, then print only the contract as PDF.</p></div><button class="btn" onclick="openCrmSub('sim')">← Simulator</button></div>
       <div id="contractEmpty" class="empty">Save a simulation or create a proposal first.</div>
       <div id="contractContent" class="hidden">
-        <div class="grid g2 no-print"><div class="card"><h3>Customer & contract data</h3><div class="fields"><div class="field"><label>Customer / contact name</label><input id="ctName"></div><div class="field"><label>Company</label><input id="ctCompany"></div><div class="field"><label>Email</label><input id="ctEmail" type="email"></div><div class="field"><label>Delivery date</label><input id="ctDelivery" type="date"></div><div class="field"><label>Payment method</label><select id="ctPayment"><option>Bank transfer</option><option>Card / payment provider</option><option>Invoice terms</option></select></div><div class="field"><label>Payment account / IBAN · session only</label><input id="ctBank" autocomplete="off" placeholder="Not exported in raw form"></div><div class="field full"><label>Payment reference</label><input id="ctReference"></div><div class="field full"><label><input id="ctAccept" type="checkbox" style="width:auto;margin-right:6px"> Commercial terms confirmed with the customer</label></div></div><div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap"><button class="btn dark" onclick="generateContract()">Confirm contract</button><button class="btn" onclick="printContract()">Print / Save contract PDF</button><button class="btn" onclick="emailContract()">Prepare email</button><button class="btn good" onclick="createSalesOrder()">Create service order</button></div></div><div class="card"><h3>Closing state</h3><div id="closingState" class="micro">Draft generated from the current proposal.</div><div class="callout"><b>Payment governance.</b> Full bank credentials are not included in CRM exports. In production, payment data should be routed through an authorised payment/banking provider.</div></div></div>
+        <div class="grid g2 no-print">
+          <div class="card">
+            <h3>Closing & bank-transfer details</h3>
+            <p class="micro" style="margin:0 0 10px">SQL is only payment-ready when the customer has accepted the commercial terms, the contract is confirmed and the bank-transfer data required by the next Sales / Ecommerce process are complete.</p>
+            <div class="fields">
+              <div class="field"><label>Customer / contact name</label><input id="ctName"></div>
+              <div class="field"><label>Company</label><input id="ctCompany"></div>
+              <div class="field"><label>Email</label><input id="ctEmail" type="email"></div>
+              <div class="field"><label>Delivery date</label><input id="ctDelivery" type="date"></div>
+              <div class="field"><label>Commercial acceptance date</label><input id="ctAcceptanceDate" type="date"></div>
+              <div class="field"><label>Payment method</label><input id="ctPayment" value="Bank transfer" readonly></div>
+              <div class="field"><label>Account holder</label><input id="ctBankHolder" placeholder="Customer / company account holder"></div>
+              <div class="field"><label>Bank-transfer account / IBAN</label><input id="ctBank" autocomplete="off" placeholder="Required for payment handoff"></div>
+              <div class="field"><label>Bank-data status</label><input id="ctBankDataStatus" readonly placeholder="PENDING"></div>
+              <div class="field"><label>Transfer reference</label><input id="ctReference"></div>
+              <div class="field"><label>Billing name</label><input id="ctBillingName"></div>
+              <div class="field"><label>Billing / tax ID</label><input id="ctBillingTaxId"></div>
+              <div class="field full"><label>Billing address</label><input id="ctBillingAddress"></div>
+              <div class="field full"><label><input id="ctAccept" type="checkbox" style="width:auto;margin-right:6px"> Customer acceptance of the commercial terms is confirmed</label></div>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
+              <button class="btn dark" onclick="generateContract()">Confirm acceptance & contract</button>
+              <button class="btn" onclick="printContract()">Print / Save contract PDF</button>
+              <button class="btn" onclick="emailContract()">Prepare email</button>
+              <button class="btn good" id="createOrderBtn" onclick="createSalesOrder()">Generate service order</button>
+            </div>
+          </div>
+          <div class="card"><h3>Closing state</h3><div id="closingState" class="micro">Draft generated from the current proposal.</div><div id="closingGateList" class="closing-gates"></div><div class="callout"><b>Classroom payment model.</b> The Example uses visibly fictitious bank-transfer accounts marked <b>DEMO_ONLY</b>. The Sales Order Handoff carries the transfer data so the next pill can simulate payment, billing and invoicing. A production deployment should protect bank data with appropriate secure storage and access controls.</div></div>
+        </div>
         <article class="contract-paper print-target" id="contractPaper"></article>
       </div>
     </section>
@@ -208,13 +238,13 @@
 <div class="card output-handoff" style="margin-bottom:14px">
   <div class="source-kicker">PRIMARY SALES HANDOFF</div>
   <div class="handoff-title">DOC ROI · SQL Sales Order Handoff</div>
-  <p class="handoff-note">One row per converted opportunity, carrying the available lead, customer-intelligence, commercial, contract, activity and order fields required to start payment, billing and execution in the next Sales / Ecommerce process. SQL does not execute payment or invoicing.</p>
+  <p class="handoff-note">One row per payment-ready converted opportunity, carrying lead, customer-intelligence, commercial, acceptance, contract, bank-transfer, billing, activity and order fields required to start payment, billing and execution in the next Sales / Ecommerce process. SQL prepares the handoff; it does not execute the transfer or invoice.</p>
   <div class="grid g4" id="crmOutputKpis"></div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:11px"><button class="btn dark" onclick="downloadSalesOrderHandoff()">Download Sales Order Handoff CSV</button><button class="btn" onclick="downloadCommercialProductivity()">Download Commercial Productivity CSV</button><button class="btn" onclick="downloadLeadStatus()">Download Lead Status CSV</button></div>
 </div>
 <div class="section-title">Converted sales orders · preview</div>
 <div class="table-wrap output-preview" style="margin-bottom:16px"><table><thead><tr><th>Sales order</th><th>Lead</th><th>Source</th><th>Adviser</th><th>Customer</th><th>Product</th><th>Units</th><th>Total</th><th>Contract</th><th>Payment</th><th>Billing</th><th>Priority</th><th>Execution</th></tr></thead><tbody id="crmOutputBody"></tbody></table></div>
-<div class="callout"><b>Boundary.</b> SQL stops at a complete commercial handoff. Payment execution, billing, invoice issuance, fulfilment and delivery belong to the next Sales / Ecommerce process.</div>
+<div class="callout"><b>Boundary.</b> SQL stops at <b>READY FOR PAYMENT</b>: accepted offer + confirmed contract + complete transfer data + service order. Payment execution, billing, invoice issuance, fulfilment and delivery belong to the next Sales / Ecommerce process.</div>
 <div class="grid g2 core-output-grid">
   <div class="card core-output"><div class="output-number">OUTPUT 1</div><h3>Sales Conversion · Orders ready for execution</h3><p>Only WON opportunities are exported. The handoff contains customer/lead identity, source, adviser, commercial terms, contract status, payment request state, billing requirement and order priority.</p><div class="core-output-metric"><b id="outWonCount">0</b><span>sales orders</span></div><button class="btn dark" onclick="downloadSalesOrders()">Download SQL_SALES_ORDERS.csv</button></div>
   <div class="card core-output"><div class="output-number">OUTPUT 2</div><h3>Commercial Productivity · Work + Quality</h3><p>One reusable management dataset combining source, adviser, conversion, standard points, actual hours, productivity P, NPS quality and commercial economics.</p><div class="core-output-metric"><b id="outProdRows">0</b><span>adviser × source rows</span></div><button class="btn dark" onclick="downloadCommercialProductivity()">Download SQL_COMMERCIAL_PRODUCTIVITY.csv</button></div>
@@ -668,6 +698,152 @@ loadExample=function(){
 const _renderAllV6=renderAll;
 renderAll=function(){_renderAllV6();renderIntakeStatus();renderCrmOutput();syncCrmSelectors()}
 
+
+/* =============================
+   v9 payment-ready closing patch
+   ============================= */
+[
+  ['Confirm commercial acceptance',6,0.10],
+  ['Capture transfer data',6,0.10],
+  ['Validate order information',6,0.10],
+  ['Generate service order',9,0.15]
+].forEach(t=>{if(!DEFAULT_TASKS.find(x=>x[0]===t[0]))DEFAULT_TASKS.push(t)});
+defaultTasks=function(){return DEFAULT_TASKS.map(t=>[t[0],t[1],t[2],t[0]])};
+STAGE_TASK_MAP.Won='Generate service order';
+
+function demoBankAccount(i){return `ES00 0000 0000 0000 0000 ${String(i+1).padStart(4,'0')}`}
+function demoTaxId(i){return `DEMO-TAX-${String(i+1).padStart(4,'0')}`}
+function isoNow(){return new Date().toISOString()}
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function bankDataComplete(l){return !!(l&&String(l.account_holder||'').trim()&&String(l.bank_transfer_account||'').trim()&&String(l.payment_reference||'').trim())}
+function acceptedCommercially(l){return !!(l&&l.commercial_acceptance_status==='ACCEPTED')}
+function contractConfirmed(l){return !!(l&&String(l.contract_status||'').toUpperCase().includes('CONFIRMED'))}
+function isPaymentReady(l){return acceptedCommercially(l)&&bankDataComplete(l)&&contractConfirmed(l)}
+function setGateHtml(l){
+  const target=$('closingGateList');if(!target||!l)return;
+  const gates=[
+    ['Commercial acceptance',acceptedCommercially(l)],
+    ['Bank-transfer data',bankDataComplete(l)],
+    ['Contract confirmed',contractConfirmed(l)],
+    ['Payment handoff',isPaymentReady(l)]
+  ];
+  target.innerHTML=gates.map(([label,ok],i)=>`<div class="closing-gate ${ok?'ok':'pending'}"><b>${label}</b><span>${ok?(i===3?'READY':'COMPLETE'):'PENDING'}</span></div>`).join('');
+  const btn=$('createOrderBtn');if(btn)btn.disabled=!isPaymentReady(l);
+}
+function ensureLeadClosingFields(l){
+  if(!l)return;
+  l.payment_method=l.payment_method||'Bank transfer';
+  l.commercial_acceptance_status=l.commercial_acceptance_status||'PENDING';
+  l.commercial_acceptance_timestamp=l.commercial_acceptance_timestamp||'';
+  l.account_holder=l.account_holder||'';
+  l.bank_transfer_account=l.bank_transfer_account||'';
+  l.bank_data_status=l.bank_data_status||'PENDING';
+  l.bank_data_captured_timestamp=l.bank_data_captured_timestamp||'';
+  l.billing_name=l.billing_name||l.contact_name||'';
+  l.billing_tax_id=l.billing_tax_id||'';
+  l.billing_address=l.billing_address||'';
+  l.payment_ready=l.payment_ready||'NO';
+  l.payment_ready_timestamp=l.payment_ready_timestamp||'';
+}
+
+renderContractView=function(){
+  const l=selectedLead();const s=l?.simulation_data||state.simulation;const ready=!!(l&&s&&s.total);
+  $('contractEmpty').classList.toggle('hidden',ready);$('contractContent').classList.toggle('hidden',!ready);if(!ready)return;
+  ensureLeadClosingFields(l);state.simulation=clone(s);
+  $('ctName').value=l.contact_name||'';$('ctCompany').value=l.company_name||'';$('ctEmail').value=l.contact_email||'';$('ctDelivery').value=l.delivery_date||l.qualification_date||'';
+  $('ctAcceptanceDate').value=(l.commercial_acceptance_timestamp||'').slice(0,10)||todayISO();
+  $('ctPayment').value='Bank transfer';$('ctBankHolder').value=l.account_holder||'';$('ctBank').value=l.bank_transfer_account||'';$('ctBankDataStatus').value=l.bank_data_status||'PENDING';$('ctReference').value=l.payment_reference||`REF-${l.lead_id}`;
+  $('ctBillingName').value=l.billing_name||l.contact_name||'';$('ctBillingTaxId').value=l.billing_tax_id||'';$('ctBillingAddress').value=l.billing_address||'';
+  $('ctAccept').checked=acceptedCommercially(l)||contractConfirmed(l);
+  renderContractPaper();
+  const readyFlag=isPaymentReady(l);l.payment_ready=readyFlag?'YES':'NO';
+  $('closingState').innerHTML=readyFlag?`<span class="payment-ready-badge ready">READY FOR PAYMENT HANDOFF</span> · ${esc(l.sales_order_id||'service order not yet generated')}`:`<span class="payment-ready-badge pending">NOT READY</span> · complete acceptance, transfer data and contract.`;
+  setGateHtml(l);
+}
+
+renderContractPaper=function(){
+  const l=selectedLead();if(!l)return;ensureLeadClosingFields(l);const s=l.simulation_data||state.simulation||simulationSnapshot();
+  const rfm=l.rfm_category||'UNKNOWN',nps=npsDisplay(l),abcd=l.abcd_class||'UNKNOWN',spo=spoDisplay(l);
+  const demoNote=l.bank_data_status==='DEMO_ONLY'?' · DEMO ONLY / FICTIONAL CLASSROOM DATA':'';
+  $('contractPaper').innerHTML=`<div class="contract-head"><div><div class="micro">ASSISTED SALES AGREEMENT</div><h2>${esc($('cfgCompany').value||'DOC ROI Commercial Example')}</h2><p>Lead ${esc(l.lead_id)} · Customer ${esc(l.customer_key)} · Adviser ${esc(l.assigned_sales)}</p></div><span class="tag">${contractConfirmed(l)?'CONFIRMED':'DRAFT / CLASSROOM'}</span></div>
+  <h3>1. Customer and purpose</h3><p>This agreement records the assisted sale configured with <b>${esc(l.contact_name||l.customer_key)}</b> / ${esc(l.company_name||'[Customer company]')} for <b>${esc(s.product||$('cfgProduct').value)}</b>.</p>
+  <h3>2. Commercial configuration</h3><p>Quantity: <b>${s.quantity}</b> · List price: <b>${money(s.list_price)}</b> per unit · Discount: <b>${pct(s.discount_pct)}</b> · Selected benefit: <b>${esc(s.benefit)}</b> · Shipping: <b>${money(s.shipping_eur)}</b> · Packaging: <b>${money(s.packaging_eur)}</b> · Customer total: <b>${money(s.total)}</b>.</p>
+  <h3>3. Delivery and service</h3><p>Requested delivery date: <b>${esc(l.delivery_date||'PENDING')}</b>. Service commitments remain subject to confirmed availability and downstream operational execution.</p>
+  <h3>4. Acceptance and bank transfer</h3><p>Commercial acceptance: <b>${esc(l.commercial_acceptance_status||'PENDING')}</b> · Acceptance date: <b>${esc((l.commercial_acceptance_timestamp||'').slice(0,10)||'PENDING')}</b> · Method: <b>Bank transfer</b>.</p><p>Account holder: <b>${esc(l.account_holder||'PENDING')}</b> · Bank-transfer account / IBAN: <b>${esc(l.bank_transfer_account||'PENDING')}</b> · Transfer reference: <b>${esc(l.payment_reference||'PENDING')}</b> · Data status: <b>${esc(l.bank_data_status||'PENDING')}</b>${esc(demoNote)}.</p>
+  <h3>5. Billing handoff</h3><p>Billing name: <b>${esc(l.billing_name||'PENDING')}</b> · Billing/tax ID: <b>${esc(l.billing_tax_id||'PENDING')}</b> · Billing address: <b>${esc(l.billing_address||'PENDING')}</b>.</p>
+  <h3>6. Customer intelligence note</h3><p>RFM: <b>${esc(rfm)}</b> · NPS: <b>${esc(nps)}</b> · ABCD: <b>${esc(abcd)}</b> · SPO: <b>${esc(spo)}</b>. UNKNOWN remains UNKNOWN for prospects without relationship history.</p>
+  <h3>7. Training and governance note</h3><p>This document is generated by a classroom simulator. In the Example, bank-transfer data are explicitly fictitious. A production deployment must validate legal, tax, privacy, security and banking requirements before storing or transmitting customer financial data.</p>
+  <div class="signatures"><div class="sig">Customer<br>Name / signature / date</div><div class="sig">Commercial representative<br>${esc(l.assigned_sales)} / signature / date</div></div>`;
+}
+
+function logClosingTaskOnce(l,task,result){
+  if(!l)return;const exists=state.activities.some(a=>(a.lead_id===l.lead_id||a.customer_key===l.customer_key)&&a.task===task&&String(a.result).includes(result));if(exists)return;
+  const t=getTask(task);logActivity(l,task,t[1],result);
+}
+
+generateContract=function(){
+  const l=selectedLead();if(!l)return;ensureLeadClosingFields(l);
+  if(!$('ctAccept').checked){alert('Confirm the customer acceptance of the commercial terms.');return}
+  const holder=$('ctBankHolder').value.trim(),account=$('ctBank').value.trim(),reference=$('ctReference').value.trim();
+  if(!holder||!account||!reference){alert('Account holder, bank-transfer account / IBAN and transfer reference are required before the contract can be confirmed.');return}
+  l.contact_name=$('ctName').value.trim();l.company_name=$('ctCompany').value.trim();l.contact_email=$('ctEmail').value.trim();l.delivery_date=$('ctDelivery').value;
+  l.commercial_acceptance_status='ACCEPTED';l.commercial_acceptance_timestamp=($('ctAcceptanceDate').value||todayISO())+'T12:00:00Z';l.payment_method='Bank transfer';
+  l.account_holder=holder;l.bank_transfer_account=account;l.bank_data_status=state.example?'DEMO_ONLY':'USER_PROVIDED';l.bank_data_captured_timestamp=isoNow();l.payment_reference=reference;
+  l.billing_name=$('ctBillingName').value.trim();l.billing_tax_id=$('ctBillingTaxId').value.trim();l.billing_address=$('ctBillingAddress').value.trim();
+  l.contract_status='Confirmed';l.contract_confirmed_timestamp=isoNow();state.contractGenerated=true;if(stageIndex(l.stage)<stageIndex('Contracted'))l.stage='Contracted';l.stage_probability_pct=90;
+  logClosingTaskOnce(l,'Confirm commercial acceptance','Acceptance confirmed');logClosingTaskOnce(l,'Capture transfer data','Transfer data captured');logClosingTaskOnce(l,'Validate order information','Order information validated');logClosingTaskOnce(l,'Contract preparation','Contract confirmed');
+  l.payment_ready=isPaymentReady(l)?'YES':'NO';if(l.payment_ready==='YES'&&!l.payment_ready_timestamp)l.payment_ready_timestamp=isoNow();l.next_action=l.payment_ready==='YES'?'Generate service order for Sales / Ecommerce':'Complete closing data';
+  renderContractPaper();renderContractView();renderQueue();renderLead();renderOrderQueue();renderPerformance();markDone();
+}
+
+createSalesOrder=function(){
+  const l=selectedLead();if(!l)return;ensureLeadClosingFields(l);if(!isPaymentReady(l)){alert('The opportunity is not payment-ready. Confirm acceptance, transfer data and contract first.');renderContractView();return}
+  const s=l.simulation_data||state.simulation||simulationSnapshot();const existing=state.orders.find(x=>x.lead_id===l.lead_id)||state.orders.find(x=>x.customer_key===l.customer_key);const id=existing?.sales_order_id||`SO-${new Date().getFullYear()}-${String(state.orders.length+1).padStart(4,'0')}`;const serviceId=existing?.service_order_id||`SVC-${id}`;
+  const o={sales_order_id:id,service_order_id:serviceId,lead_id:l.lead_id,customer_key:l.customer_key,rfm_customer_key:l.rfm_customer_key||'',lead_source_group:sourceOf(l),lead_source:SOURCE_LABELS[sourceOf(l)]||l.lead_source||'',lead_type:l.lead_type||'',commercial_id:l.assigned_sales,product_id:l.primary_product_id||'',product_name:s.product,quantity:s.quantity,list_price:s.list_price,discount_pct:s.discount_pct,benefit_type:s.benefit,shipping_eur:s.shipping_eur,packaging_eur:s.packaging_eur,order_total_eur:s.total,commercial_acceptance_status:'ACCEPTED',commercial_acceptance_timestamp:l.commercial_acceptance_timestamp,contract_status:l.contract_status,account_holder:l.account_holder,bank_transfer_account:l.bank_transfer_account,bank_data_status:l.bank_data_status,bank_data_captured_timestamp:l.bank_data_captured_timestamp,payment_method:'Bank transfer',payment_reference:l.payment_reference,payment_ready:'YES',payment_ready_timestamp:l.payment_ready_timestamp||isoNow(),payment_execution_status:'PENDING_NEXT_PILL',billing_name:l.billing_name||'',billing_tax_id:l.billing_tax_id||'',billing_address:l.billing_address||'',billing_execution_status:'PENDING_NEXT_PILL',invoice_execution_status:'PENDING_NEXT_PILL',fulfilment_status:'PENDING_NEXT_PILL',delivery_requirement:l.delivery_date||'',service_requirement:hasNum(l.spo_score)?l.spo_segment:'Standard',service_order_status:'READY FOR PAYMENT HANDOFF',order_priority:orderPriority(l),sales_order_status:'READY FOR PAYMENT',order_date:todayISO()};
+  state.orders=state.orders.filter(x=>x.lead_id!==l.lead_id&&x.customer_key!==l.customer_key);state.orders.push(o);l.sales_order_id=id;l.service_order_id=serviceId;l.stage='Won';l.stage_probability_pct=100;l.proposal_status='Accepted';l.payment_ready='YES';l.payment_ready_timestamp=o.payment_ready_timestamp;l.next_action='Sales / Ecommerce executes bank transfer, billing, invoice and fulfilment';
+  logClosingTaskOnce(l,'Generate service order','Service order generated');
+  $('closingState').innerHTML=`<span class="payment-ready-badge ready">READY FOR PAYMENT HANDOFF</span> · ${esc(id)} · ${esc(serviceId)}`;
+  syncCrmSelectors();renderQueue();renderLead();renderOrderQueue();renderProductivity();renderPerformance();renderCrmOutput();markDone();openCrmSub('order');
+}
+
+const _commercialProductivityRowsV9=commercialProductivityRows;
+commercialProductivityRows=function(){return _commercialProductivityRowsV9().map(r=>{const leads=state.leads.filter(l=>l.assigned_sales===r.commercial_id&&sourceOf(l)===r.lead_source_group);const ready=leads.filter(l=>l.payment_ready==='YES').length;return {...r,payment_ready_count:ready,payment_ready_rate_pct:leads.length?ready/leads.length*100:0}})};
+const _funnelBySourceRowsV9=funnelBySourceRows;
+funnelBySourceRows=function(){return _funnelBySourceRowsV9().map(r=>{const leads=state.leads.filter(l=>sourceOf(l)===r.lead_source_group),ready=leads.filter(l=>l.payment_ready==='YES').length;return {...r,payment_ready:ready,payment_ready_rate_pct:leads.length?ready/leads.length*100:0}})};
+
+salesOrderHandoffRows=function(){
+  return state.orders.filter(o=>o.payment_ready==='YES'||o.payment_ready===true).map(o=>{
+    const l=state.leads.find(x=>x.lead_id===o.lead_id)||state.leads.find(x=>x.customer_key===o.customer_key)||{};ensureLeadClosingFields(l);
+    const acts=state.activities.filter(a=>a.lead_id===l.lead_id||a.customer_key===l.customer_key),points=acts.reduce((s,a)=>s+n(a.baremed_points),0),mins=acts.reduce((s,a)=>s+n(a.actual_minutes),0),hours=mins/60,sim=l.simulation_data||{};
+    return {schema_version:'1.1',dataset_id:'DOC_ROI_SQL_SALES_ORDER_HANDOFF',handoff_id:`SQL-HANDOFF-${o.sales_order_id||o.lead_id}`,handoff_timestamp:isoNow(),execution_status:'READY_FOR_PAYMENT',sales_order_id:o.sales_order_id||'',service_order_id:o.service_order_id||'',order_date:o.order_date||'',order_priority:o.order_priority||orderPriority(l),sales_order_status:'READY FOR PAYMENT',service_order_status:o.service_order_status||'READY FOR PAYMENT HANDOFF',lead_id:l.lead_id||o.lead_id||'',customer_key:l.customer_key||o.customer_key||'',rfm_customer_key:l.rfm_customer_key||'',source_customer_id:l.source_customer_id||'',lead_source_group:sourceOf(l),lead_source:SOURCE_LABELS[sourceOf(l)]||l.lead_source||'',lead_type:l.lead_type||'',lead_origin_type:l.lead_origin_type||'',commercial_id:l.assigned_sales||o.commercial_id||'',funnel_stage:l.stage||'Won',contact_name:l.contact_name||'',contact_email:l.contact_email||'',company_name:l.company_name||'',campaign:l.campaign||'',utm_source:l.utm_source||'',utm_medium:l.utm_medium||'',utm_campaign:l.utm_campaign||'',utm_content:l.utm_content||'',entry_4p:l.entry_4p||'',purchase_intent:l.purchase_intent||'',handoff_status:l.handoff_status||'',product_interest:l.product_interest||'',primary_product_id:l.primary_product_id||o.product_id||'',primary_product_name:l.primary_product_name||o.product_name||'',sku:l.sku||'',variant:l.variant||'',rfm_factor:l.rfm_factor||'',rfm_category:l.rfm_category||'UNKNOWN',rfm_movement:l.rfm_movement||'UNKNOWN',rfm_segment:l.rfm_segment||'UNKNOWN',rfm_action:l.rfm_action||'UNKNOWN',nps_score:numOrBlank(l.nps_score),nps_type:l.nps_type||'UNKNOWN',nps_movement:l.nps_movement||'UNKNOWN',nps_main_factor:l.nps_main_factor||'UNKNOWN',nps_action:l.nps_action||'UNKNOWN',abcd_class:l.abcd_class||'UNKNOWN',product_value_score:l.product_value_score||'',spo_score:numOrBlank(l.spo_score),spo_segment:l.spo_segment||'UNKNOWN',spo_segment_label:l.spo_segment_label||'UNKNOWN',qualification_use_case:l.qualification_use_case||'',qualification_need:l.qualification_need||'',qualification_units:l.qualification_units||'',qualification_date:l.qualification_date||'',qualification_notes:l.qualification_notes||'',quantity:o.quantity||sim.quantity||'',list_price:o.list_price||sim.list_price||'',discount_pct:o.discount_pct||sim.discount_pct||'',benefit_type:o.benefit_type||sim.benefit||'',shipping_eur:o.shipping_eur??sim.shipping_eur??'',packaging_eur:o.packaging_eur??sim.packaging_eur??'',order_total_eur:o.order_total_eur||sim.total||'',estimated_variable_cost_eur:sim.variable_cost||'',estimated_contribution_eur:sim.contribution||'',estimated_contribution_pct:sim.contribution_pct||'',proposal_total:l.proposal_total||'',proposal_benefit:l.proposal_benefit||'',proposal_status:l.proposal_status||'',commercial_acceptance_status:l.commercial_acceptance_status||o.commercial_acceptance_status||'',commercial_acceptance_timestamp:l.commercial_acceptance_timestamp||o.commercial_acceptance_timestamp||'',contract_status:l.contract_status||o.contract_status||'',contract_confirmed_timestamp:l.contract_confirmed_timestamp||'',payment_method:'Bank transfer',account_holder:l.account_holder||o.account_holder||'',bank_transfer_account:l.bank_transfer_account||o.bank_transfer_account||'',bank_data_status:l.bank_data_status||o.bank_data_status||'',bank_data_captured_timestamp:l.bank_data_captured_timestamp||o.bank_data_captured_timestamp||'',payment_reference:l.payment_reference||o.payment_reference||'',payment_ready:'YES',payment_ready_timestamp:l.payment_ready_timestamp||o.payment_ready_timestamp||'',payment_execution_status:'PENDING_NEXT_PILL',billing_name:l.billing_name||o.billing_name||'',billing_tax_id:l.billing_tax_id||o.billing_tax_id||'',billing_address:l.billing_address||o.billing_address||'',billing_execution_status:'PENDING_NEXT_PILL',invoice_execution_status:'PENDING_NEXT_PILL',delivery_requirement:l.delivery_date||o.delivery_requirement||'',fulfilment_status:'PENDING_NEXT_PILL',activity_count:acts.length,standard_points:points.toFixed(2),actual_minutes:mins,actual_hours:hours.toFixed(2),lead_productivity_p:hours?(points/hours).toFixed(3):'',next_action:'Execute bank transfer, billing/invoice and fulfilment in Sales / Ecommerce',manager_note:l.manager_note||''};
+  }).sort((a,b)=>String(a.order_priority).localeCompare(String(b.order_priority))||String(a.sales_order_id).localeCompare(String(b.sales_order_id)));
+}
+downloadSalesOrders=function(){blobDownload(toCSV(salesOrderHandoffRows()),'DOC_ROI_SQL_SALES_ORDERS_PAYMENT_READY.csv')};
+
+renderCrmOutput=function(){
+  const rows=salesOrderHandoffRows(),won=state.leads.filter(isWon).length,total=state.leads.length,ready=state.leads.filter(l=>l.payment_ready==='YES').length,revenue=rows.reduce((s,r)=>s+n(r.order_total_eur),0);
+  if($('crmOutputKpis'))$('crmOutputKpis').innerHTML=[['Converted / WON',won,`${total?pct(won/total*100):'—'} SQL conversion`],['Payment-ready',ready,total?`${pct(ready/total*100)} of SQL managed`:'—'],['Order value',money(revenue),'payment-ready commercial value'],['Next process','Sales / Ecommerce','bank transfer · billing · invoice · fulfilment']].map(x=>`<div class="kpi"><div class="label">${x[0]}</div><div class="value" style="${typeof x[1]==='string'&&x[1].length>12?'font-size:16px':''}">${x[1]}</div><div class="hint">${x[2]}</div></div>`).join('');
+  if($('crmOutputBody'))$('crmOutputBody').innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.sales_order_id)}</b></td><td>${esc(r.lead_id)}</td><td>${esc(SOURCE_LABELS[r.lead_source_group]||r.lead_source)}</td><td>${esc(r.commercial_id)}</td><td>${esc(r.contact_name||r.customer_key)}</td><td>${esc(r.primary_product_name)}</td><td>${esc(r.quantity)}</td><td>${money(r.order_total_eur)}</td><td>${esc(r.contract_status)}</td><td><span class="handoff-status ready">READY</span></td><td>${esc(r.billing_execution_status)}</td><td>${esc(r.order_priority)}</td><td><span class="handoff-status ready">READY FOR PAYMENT</span></td></tr>`).join(''):'<tr><td colspan="13">No payment-ready sales orders yet.</td></tr>';
+  if($('outWonCount'))$('outWonCount').textContent=rows.length;if($('outProdRows'))$('outProdRows').textContent=commercialProductivityRows().length;
+}
+
+function enrichPaymentReadyExample(){
+  const won=state.leads.filter(l=>l.stage==='Won');
+  state.activities=state.activities.filter(a=>!(won.some(l=>l.lead_id===a.lead_id)&&a.task==='Close / service order'));
+  won.forEach((l,i)=>{ensureLeadClosingFields(l);l.commercial_acceptance_status='ACCEPTED';l.commercial_acceptance_timestamp=`2027-10-${String((i%20)+5).padStart(2,'0')}T11:00:00Z`;l.account_holder=`DEMO CUSTOMER ${l.customer_key}`;l.bank_transfer_account=demoBankAccount(i);l.bank_data_status='DEMO_ONLY';l.bank_data_captured_timestamp=`2027-10-${String((i%20)+5).padStart(2,'0')}T11:10:00Z`;l.payment_method='Bank transfer';l.payment_reference=`DEMO-TRF-${String(i+1).padStart(4,'0')}`;l.billing_name=l.contact_name||`DEMO CUSTOMER ${i+1}`;l.billing_tax_id=demoTaxId(i);l.billing_address=`DEMO ADDRESS ${i+1} · Madrid · Spain`;l.contract_status='Confirmed - classroom example';l.contract_confirmed_timestamp=`2027-10-${String((i%20)+5).padStart(2,'0')}T11:20:00Z`;l.payment_ready='YES';l.payment_ready_timestamp=`2027-10-${String((i%20)+5).padStart(2,'0')}T11:25:00Z`;l.next_action='Sales / Ecommerce executes bank transfer, billing, invoice and fulfilment';
+    const taskData=[['Confirm commercial acceptance','Acceptance confirmed'],['Capture transfer data','Transfer data captured'],['Validate order information','Order information validated'],['Generate service order','Service order generated']];taskData.forEach((x,j)=>{const t=getTask(x[0]),jitter=[.9,1,1.1,.95][(i+j)%4];state.activities.push({activity_id:`PAY-${String(i+1).padStart(3,'0')}-${String(j+1).padStart(2,'0')}`,commercial_id:l.assigned_sales,lead_id:l.lead_id,customer_key:l.customer_key,task:t[0],task_key:t[3]||t[0],standard_minutes:t[1],baremed_points:t[2],actual_minutes:Number((n(t[1])*jitter).toFixed(1)),result:x[1],evidence:'Classroom example closing evidence',timestamp:`2027-10-${String((i%20)+5).padStart(2,'0')}T${String(12+j).padStart(2,'0')}:00:00Z`})});
+    let o=state.orders.find(o=>o.lead_id===l.lead_id)||state.orders.find(o=>o.customer_key===l.customer_key);if(!o){const sm=l.simulation_data,id=`SO-2027-${String(i+1).padStart(4,'0')}`;o={sales_order_id:id,lead_id:l.lead_id,customer_key:l.customer_key,commercial_id:l.assigned_sales,product_id:l.primary_product_id,product_name:sm.product,quantity:sm.quantity,list_price:sm.list_price,discount_pct:sm.discount_pct,benefit_type:sm.benefit,shipping_eur:sm.shipping_eur,packaging_eur:sm.packaging_eur,order_total_eur:sm.total,order_priority:orderPriority(l),order_date:`2027-10-${String((i%20)+5).padStart(2,'0')}`};state.orders.push(o)}
+    Object.assign(o,{service_order_id:`SVC-${o.sales_order_id}`,commercial_acceptance_status:'ACCEPTED',commercial_acceptance_timestamp:l.commercial_acceptance_timestamp,contract_status:l.contract_status,account_holder:l.account_holder,bank_transfer_account:l.bank_transfer_account,bank_data_status:'DEMO_ONLY',bank_data_captured_timestamp:l.bank_data_captured_timestamp,payment_method:'Bank transfer',payment_reference:l.payment_reference,payment_ready:'YES',payment_ready_timestamp:l.payment_ready_timestamp,payment_execution_status:'PENDING_NEXT_PILL',billing_name:l.billing_name,billing_tax_id:l.billing_tax_id,billing_address:l.billing_address,billing_execution_status:'PENDING_NEXT_PILL',invoice_execution_status:'PENDING_NEXT_PILL',fulfilment_status:'PENDING_NEXT_PILL',service_order_status:'READY FOR PAYMENT HANDOFF',sales_order_status:'READY FOR PAYMENT'});l.sales_order_id=o.sales_order_id;l.service_order_id=o.service_order_id;
+  });
+}
+
+const _loadExampleV8=loadExample;
+loadExample=function(){_loadExampleV8();enrichPaymentReadyExample();state.example=true;renderAll();renderIntakeStatus();renderCrmOutput();syncCrmSelectors();$('globalStatus').textContent+=' · All WON opportunities include fictional DEMO_ONLY bank-transfer data and are payment-ready for the next classroom process.';openTab('v00')};
+
+const _resetSessionV8=resetSession;
+resetSession=function(){_resetSessionV8();state.tasks=defaultTasks();if(!state.tasks.find(t=>t[0]==='Lost / disposition'))state.tasks.push(['Lost / disposition',6,0.10,'Lost / disposition']);};
+
 renderAll();resetSession();
+
 </script>
 </body></html>
